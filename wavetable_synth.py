@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from pathlib import Path
+import pyaudio
 from scipy.io import wavfile
-
 
 class LinearInterpolator():
     def __call__(self, values, index):
@@ -99,7 +99,7 @@ class Voice:
         Generate duration_seconds of samples at the 
         specified frequency.
         """
-        buffer = np.zeros((duration_seconds * self.sampling_rate,))
+        buffer = np.zeros(int(duration_seconds * self.sampling_rate))
         if np.isscalar(frequency):
             frequency = np.ones_like(buffer) * frequency
 
@@ -109,32 +109,7 @@ class Voice:
                 buffer[i] += oscillator.get_sample()
         amplitude = 10 ** (self.gain / 20)
         buffer *= amplitude
-        buffer = fade_in_out(buffer)
         return buffer
-
-
-def fade_in_out(signal, fade_length=1000):
-    """
-    Apply a half-cosine window to first and 
-    last fade_length samples of signal.
-    """
-    fade_in_envelope = (1 - np.cos(np.linspace(0, np.pi, fade_length))) * 0.5
-    fade_out_envelope = np.flip(fade_in_envelope)
-
-    # Handle 2-channel audio
-    if signal.ndim == 2:
-        fade_in_envelope = fade_in_envelope[:, np.newaxis]
-        fade_out_envelope = fade_out_envelope[:, np.newaxis]
-
-    # Apply fade-in
-    signal[:fade_length, ...] = np.multiply(
-        signal[:fade_length, ...], fade_in_envelope)
-
-    # Apply fade-out
-    signal[-fade_length:, ...] = np.multiply(
-        signal[-fade_length:, ...], fade_out_envelope)
-
-    return signal
 
 
 def generate_wavetable(length, f):
