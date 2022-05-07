@@ -255,6 +255,7 @@ def main():
                                            np.random.default_rng().uniform(-0.1, 0.1, size=instantaneous_frequency.shape))
 
     # Synthesize on a sample-by-sample basis and output
+   
     signal_with_varying_frequency = synth.synthesize(
         frequency=instantaneous_frequency, duration_seconds=duration)
     output_wavs(

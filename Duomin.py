@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Created on Fri May  6 20:32:17 2022
+
+@author: chibuzoreduzor
+"""
 
 import cv2
 from cv2 import findContours
@@ -11,33 +16,42 @@ from imutils.video import VideoStream
 import time
 import argparse
 from collections import deque
-import sound_generator
-import sounddevice as sd
-from sound_generator import generate_note
+import socket
 
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video",
     help="path to the (optional) video file")
-ap.add_argument("-b", "--buffer", type=int, default=30,
+ap.add_argument("-b", "--buffer", type=int, default=10,
     help="max buffer size")
 args = vars(ap.parse_args())
 
 greenL = (29, 86, 6)
 greenU = (64, 255, 255)
 pts = deque(maxlen=args["buffer"])
-
 if not args.get("video", False):
     vs = VideoStream(src=1).start()
-
 else:
     vs = cv2.VideoCapture(args["video"])
-    
-# allow the camera or video file to warm up   
 time.sleep(2.0)
 
-freq_array = np.zeros((1,), dtype=np.float32)
-start = time.time()
+
+
+UDP_IP = "127.0.0.1"
+UDP_PORT = 3333
+
+print("PD Connected")
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+def send_to_PD(frequency, volume, delay = 1):
+    freq_bytes = frequency.to_bytes(2, byteorder='big')
+    vol_bytes = volume.to_bytes(1, byteorder='big')
+    sock.sendto(freq_bytes+vol_bytes,
+                (UDP_IP, UDP_PORT))
+    print("freq:  ", frequency, "volume: ", volume)
+    time.sleep(delay)
+    
 while True:
     # grab the current frame
     frame = vs.read()
@@ -50,7 +64,8 @@ while True:
         break
     # resize the frame, blur it, and convert it to the HSV
     # color space
-    frame = imutils.resize(frame, width=600)
+    frame = imutils.resize(frame, width=1200)
+    max_y, max_x, channels = frame.shape
     blurred = cv2.GaussianBlur(frame, (11, 11), 0)
     hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
     # construct a mask for the color "green", then perform
@@ -81,6 +96,9 @@ while True:
             cv2.circle(frame, (int(x), int(y)), int(radius),
                 (0, 255, 255), 2)
             cv2.circle(frame, center, 5, (0, 0, 255), -1)
+            freq_scale = int(128*(4**(x/max_x)))
+            vol_scale = int(256*(y/max_y))
+            send_to_PD(freq_scale, vol_scale, delay = 0.005)
     # update the points queue
     pts.appendleft(center)
 
@@ -94,7 +112,7 @@ while True:
         # draw the connecting lines
         thickness = int(np.sqrt(args["buffer"] / float(i + 1)) * 2.5)
         cv2.line(frame, pts[i - 1], pts[i], (0, 0, 255), thickness)
-
+        
  
     # show the frame to our screen
     cv2.imshow("Frame", frame)
@@ -109,11 +127,10 @@ if not args.get("video", False):
 # otherwise, release the camera
 else:
     vs.release()
-
-stop = time.time()
-cv2.destroyAllWindows()
-signal = generate_note(None,-10, duration=5.0)
-sd.play(signal)
+    cv2.destroyAllWindows()
 # close all windows
 
 
+
+        
+        
